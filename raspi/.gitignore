@@ -1,0 +1,15 @@
+*.o
+*~
+*.bin
+kernel.*
+kernel7.img
+*.layout
+*.depend
+
+.deps
+autom4te.cache
+config.h
+config.log
+config.status
+configure
+Makefile
