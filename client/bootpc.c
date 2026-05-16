@@ -69,8 +69,11 @@ int main(int argc, char **argv)
         break;
     }
 
-    if (run_monitor)
+    if (run_monitor) {
+        /* Target kernels commonly initialize PL011 for 115200; align monitor speed. */
+        set_serial_baud(115200);
         monitor();
+    }
 
     close(ttyfd);
     return 0;

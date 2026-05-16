@@ -37,8 +37,14 @@ void uart_init()
     GPPUDCLK0 = 0;
 
     UART0_ICR = 0x7FF;
+#ifdef TARGET_BOARD_RPI
     UART0_IBRD = 1;
     UART0_FBRD = 40;
+#else
+    /* PL011 on Pi 2/3 commonly uses 48 MHz UART clock. Divisors below set 115200 baud. */
+    UART0_IBRD = 26;
+    UART0_FBRD = 3;
+#endif
     UART0_LCRH = 0x70;
     UART0_CR = 0x301;
 }

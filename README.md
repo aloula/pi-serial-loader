@@ -1,228 +1,106 @@
-pi-serial-loader
-========
+# pi-serial-loader
 
-A second stage bootloader for the Raspberry Pi to load kernels over UART.
+A second-stage bootloader for Raspberry Pi that loads kernels over UART.
 
-Upstream project
-----------------
-This repository is based on the original **PiLoader** project by Jurģis Brigmanis (Velko):
+This project is based on the original PiLoader by Jurgis Brigmanis (Velko):
 
 https://github.com/Velko/PiLoader
 
-This fork keeps the original design and protocol, and adds practical improvements for newer
-boards and more reliable serial communication.
+It keeps the original protocol and adds support and reliability improvements for newer boards.
 
-Motive
-------
-While developing bare-metal software for Raspberry Pi is fun, testing it quickly becomes tiresome.
-You need to repeat the same steps over and over again:
+## What it does
 
-1. compile your kernel
-2. power down RasPi
-3. remove SD card
-4. insert card into card reader
-5. mount cards filesystem
-6. copy compiled kernel to card
-7. unmount
-8. remove card from the reader
-9. put it back into RasPi
-10. power on RasPi, check results
-11. write some more code
-12. repeat
+- Loads plain binaries and ELF executables over serial.
+- Preserves the firmware handoff registers `r0-r2`.
+- Relocates itself out of the load area before processing commands.
+- Supports monitor mode after `EXEC`.
+- Supports watchdog control and reboot on request.
+- Optimizes binary uploads by sending large zero-filled ranges as `ZERO` commands.
 
-Wouldn't it be nice if the above could be reduced to something like this:
+## Improvements in this fork
 
-1. compile your kernel
-2. run a command, loading it on RasPi
-3. check results
-4. write some more code
-5. repeat
+- Raspberry Pi 3/3B+ support via `--enable-rpi3`.
+- Updated PL011 UART setup for Pi 2/3 clocking.
+- Safer client/server handshake with timeout-aware reads, resend on PING, and baud probing.
+- Runtime baud switching on the client.
+- Cleaner handoff before `EXEC`.
+- Modernized build guidance for `arm-none-eabi` toolchains and `autoreconf -fiv`.
 
-Well, that's what **pi-serial-loader** is all about.
+## Build
 
+### Bootloader
 
-Operation and components
-------------------------
-Raspberry Pi can be connected to computer in several ways, the easiest (to program) being UART
-interface.
+```bash
+cd raspi
+autoreconf -fiv
+./configure --host=arm-none-eabi --enable-rpi3
+make
+```
 
-Unfortunately, the ease of programming comes with a price - RasPi can not be directly connected
-to computer's serial port. It needs some sort of additional hardware to convert incompatible 
-voltage levels. I am using my own [homebrew board](http://velkoraspi.blogspot.com/2012/08/building-serial-add-on-board-part-3.html), but I'm sure there are several other options available. 
+Copy the resulting `kernel.img` or `kernel7.img` to the Raspberry Pi SD card.
 
-Once we can send bytes from computer to Raspberry Pi and back, the rest is straightforward. We need 2 pieces of software, speaking the same language at the each end of the connection.
+For Raspberry Pi 3/3B+, use the following `config.txt` settings if UART output is not routed to GPIO14/GPIO15:
 
-The part sitting on RasPi (second stage bootloader or server) starts the same way as average bare-metal kernel
-and sits there waiting for instructions.
+```ini
+arm_64bit=0
+enable_uart=1
+initial_turbo=0
+disable_splash=1
+dtoverlay=pi3-disable-bt
+kernel=kernel7.img
+```
 
-The part running on PC (client) checks if it can contact the server over the UART link, and then starts to send
-commands and data to be placed in RasPi's memory (hopefully not overwriting the bootloader itself). Once the new
-program is loaded, it instructs the server to jump to it.
+### Client
 
+```bash
+cd client
+autoreconf -fiv
+./configure
+make
+sudo make install
+```
 
+Run a kernel with:
 
-Features
-========
+```bash
+./piboot -p /dev/ttyUSB0 ../samplekernel/kernel.elf
+```
 
-Improvements in this fork
--------------------------
-* Raspberry Pi 3/3B+ build target support via *--enable-rpi3* in both bootloader and sample kernel builds.
-* Updated PL011 UART setup for Pi 2/3 clocking, improving 115200 baud reliability on newer boards.
-* More robust client/server handshake with timeout-aware reads, automatic retry during PING,
-  automatic baud probing (115200 and 1843200), and clearer diagnostics when serial data is present
-  but not boot protocol traffic.
-* Runtime serial baud switching support on the client side.
-* Cleaner kernel handoff path before *EXEC* (interrupt masking, timer stop, UART cleanup and GPIO pull-clock release),
-  reducing the chance of peripheral state leaking into loaded kernels.
-* Updated build and usage guidance for modern toolchains (e.g. *arm-none-eabi*) and autotools bootstrap
-  (*autoreconf -fiv*).
+Useful options:
 
-Relocates itself
-----------------
-RasPi firmware loads every kernel from SD card at address 0x8000 and then jumps to same address to start
-executing. *pi-serial-loader's* server is no exception. Since this is a second stage bootloader, there's a problem:
-things it is meant to load most probably will also want to occupy the space starting from 0x8000. To solve
-this, the bootloader relocates itself away from 0x8000 before starting command processing.
+- `-m` starts the serial monitor after `EXEC`.
+- `-w` disables the watchdog for kernels that manage it themselves.
+- `-v` enables verbose output.
 
+### Sample kernel
 
-ATags and boot register values
-------------------------------
-ARM bootloader protocol specifies that registers r0-r2 contains some special values.
+```bash
+cd samplekernel
+autoreconf -fiv
+./configure --host=arm-none-eabi --enable-rpi3
+make
+```
 
-* r0 - should be zero;
-* r1 - machine type. Could check if running on RasPi or different board;
-* r2 - pointer to ATags. A way to telling kernel few important things, like available memory amount;
+## Tested examples
 
-Since *pi-serial-loader* means to be as transparent as possible, it preserves these values and passes them
-to kernels when jumping to them.
+- `../samplekernel/kernel.elf` with `-v -w -m` (prints `Hello, World!`).
+- `../../zx-pi-metal/circle-zx/kernel8-32.elf` with `-v -w`.
 
-Supported files
-----------------------
-*pi-serial-loader* currently is able to load from plain binary and ELF formats.
+Both were verified successfully with `LOAD`, `ZERO`, and `EXEC` completing on the bootloader.
 
+## Troubleshooting
 
-Debugging helpers
------------------
-* Supports "polluting" memory areas which normally should be zeroed, with 0xDEADBEEF. Useful to test
-  if kernel initializes it's memory correctly. Works only when loading ELF files.
+- No kernel output after `EXEC ... OK`: run with `-m` so `piboot` stays in monitor mode.
+- Garbled monitor output: ensure host and target UART are both at 115200.
+- Sample kernel on Pi 2/3/3B+: build with `--enable-rpi3`; the sample UART setup in this fork uses Pi 2/3 PL011 divisors (`IBRD=26`, `FBRD=3`) for 115200.
+- If you changed client or samplekernel sources, rebuild before retesting:
 
+```bash
+cd client && make
+cd ../samplekernel && make
+```
 
-Monitor mode
-------------
-When kernel is started it will probably start to send some output back using UART. Monitor reads and 
-outputs anything that comes from serial line.
+## Notes
 
+The project is intentionally small and direct. If you need the original longer background and rationale, see the upstream PiLoader repository linked above.
 
-Watchdog
---------
-RasPi hardware contains a watchdog feature. Once enabled it will wait for certain amount of time
-(around 16 s) and then reboot the board. Very useful since we are going to load many untested things
-on to RasPi, and they will most likely hang. If not for watchdog, we would need to power cycle
-the RasPi then.
-
-If loaded kernel "knows what it is doing" it may disable the watchdog itself. Also there's a
-command-line option to do so.
-
-
-Reentry
--------
-If the kernel is finished everything it intended, and if it did not ruin the memory location where
-bootloader is located it may simply jump back to the bootloader's entry point.
-
-
-Intelligent upload
-------------------
-Kernel file to load sometimes can grow quite large. Often it does not contain any useful code or data
-but is just padded with zeros to certain alignment. When loading ELF files, they are already optimized
-to exclude such parts. The story is different when loading binary files. They are just a "stream of bytes"
-none of which makes any sense to naive loader.
-
-More intelligent loader (which pi-serial-loader is as of recently) can look for big chunks of zeros in binary
-streams and upload them using special command to receiver. In other words: instead of sending, say, 16 KiB
-worth of zeros, it sends a message saying "and now insert 16 KiB of zeros".
-
-
-Reboot Pi on request
---------------------
-Sometimes, while playing with hardware, just a return to bootloader is not enough. It's somewhat tainted
-environment where pheriperals are left configured from previous runs. There are some things left in memory,
-you name it. Of course you can power cycle the Pi. But now there is easier way. Just use *--reboot* switch
-with `piboot`.
-
-
-Installation and usage
-======================
-
-Clone a Git repo or download and unpack tarball.
-
-Server
-------
-Server part should be compiled using **ARM cross-compiler** for Raspberry Pi and installed on the SD card.
-Since original Raspberry Pi and Raspberry Pi 2/3 are based on slightly different SOCs (and currently there is no
-auto-detection implemented), you need to choose the target platform. Add *--enable-rpi*, *--enable-rpi2* or
-*--enable-rpi3* options when configuring sources:
-
-    cd raspi
-    autoreconf -fiv
-    ./configure --host=arm-none-eabi --enable-rpi3
-    make
-
-Now take a SD card with Raspberry Pi bootloader on it and copy *kernel.img* (or *kernel7.img* for **Raspberry Pi 2/3/3B+**)
-there. You can re-use a card with any official Linux distro image (Raspbian for example) if you do not know how to
-make an empty one. You might want to make backup (copy/rename) of existing file there first, if you plan to use that
-later.
-
-For Raspberry Pi 3/3B+, if your serial adapter on GPIO14/GPIO15 does not receive output, make sure PL011 UART is routed
-to these pins in config.txt. This setup worked reliably during testing:
-
-    arm_64bit=0
-    enable_uart=1
-    initial_turbo=0
-    disable_splash=1
-    dtoverlay=pi3-disable-bt
-    kernel=kernel7.img
-
-A note about cross-compiler: yes you need to acquire one. But if you're into low level development, you should
-already know that. Modern toolchains usually use *arm-none-eabi* prefix, while older setups may use *arm-elf-eabi*.
-Use the matching value in *--host=*.
-
-
-Client
-------
-Client part should be compiled with a regular compiler on a computer you intend to use.
-
-    cd client
-    autoreconf -fiv
-    ./configure
-    make
-    sudo make install
-
-Connect your Raspi using appropiate serial adapter to computer and power it on.
-
-Run *piboot* specifying port and kernel image to load. For example:
-
-    piboot -p /dev/ttyUSB0 kernel.elf
-
-Notes:
-* Add *-m* only if you want serial monitor output after *EXEC*.
-* Use *-w* (*--no-watchdog*) for kernels that do not manage watchdog and may take longer in heavy code paths.
-
-
-Sample kernel
--------------
-Sample kernel is provided to quickly check if everything works. It should be compiled using **ARM cross-compiler**. Similarly
-to Server:
-
-    cd samplekernel
-    autoreconf -fiv
-    ./configure --host=arm-none-eabi --enable-rpi3
-    make
-
-Now, try to upload it on Raspberry Pi using *piboot*. It should respond with *"Hello, World!"* and then return to bootloader.
-
-
-Planned features and updates
-============================
-* 2-way monitor;
-* More samples and documentation;
-* ...

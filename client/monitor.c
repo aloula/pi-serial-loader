@@ -20,15 +20,20 @@
  */
 
 #include "bootpc.h"
+#include <unistd.h>
 
 bool run_monitor;
 
 void monitor()
 {
-    char c;
+    unsigned char c;
     for (;;) {
-        c = fgetc(ttyfs);
-        putc(c, stdout);
+        ssize_t rd = read(ttyfd, &c, 1);
+        if (rd < 0)
+            continue;
+        if (rd == 0)
+            continue;
+        putc((int)c, stdout);
         fflush(stdout);
     }
 }

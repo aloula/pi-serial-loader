@@ -45,20 +45,17 @@ int kwrite(struct FILE *file, void *buffer, int size)
 
 void *memset32(void *ptr, uint32_t value, size_t bytes)
 {
-    uint32_t *p = (uint32_t *)ptr;
-    while (bytes >= sizeof(uint32_t)) {
-        *p = value;
-        p++;
-        bytes -= sizeof(uint32_t);
+    uint8_t *p = (uint8_t *)ptr;
+    uint8_t pattern[sizeof(uint32_t)];
+    uint8_t *value_bytes = (uint8_t *)&value;
+    size_t i;
+
+    for (i = 0; i < sizeof(pattern); i++) {
+        pattern[i] = value_bytes[i];
     }
 
-    uint8_t *cs = (uint8_t *)&value;
-    uint8_t *ct = (uint8_t *)p;
-    while (bytes > 0) {
-        *ct = *cs;
-        ct++;
-        cs++;
-        bytes--;
+    for (i = 0; i < bytes; i++) {
+        p[i] = pattern[i % sizeof(pattern)];
     }
     return ptr;
 }
