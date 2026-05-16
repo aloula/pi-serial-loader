@@ -1,7 +1,16 @@
-PiLoader
+pi-serial-loader
 ========
 
 A second stage bootloader for the Raspberry Pi to load kernels over UART.
+
+Upstream project
+----------------
+This repository is based on the original **PiLoader** project by Jurģis Brigmanis (Velko):
+
+https://github.com/Velko/PiLoader
+
+This fork keeps the original design and protocol, and adds practical improvements for newer
+boards and more reliable serial communication.
 
 Motive
 ------
@@ -29,7 +38,7 @@ Wouldn't it be nice if the above could be reduced to something like this:
 4. write some more code
 5. repeat
 
-Well, that's what **PiLoader** is all about.
+Well, that's what **pi-serial-loader** is all about.
 
 
 Operation and components
@@ -55,10 +64,23 @@ program is loaded, it instructs the server to jump to it.
 Features
 ========
 
+Improvements in this fork
+-------------------------
+* Raspberry Pi 3/3B+ build target support via *--enable-rpi3* in both bootloader and sample kernel builds.
+* Updated PL011 UART setup for Pi 2/3 clocking, improving 115200 baud reliability on newer boards.
+* More robust client/server handshake with timeout-aware reads, automatic retry during PING,
+  automatic baud probing (115200 and 1843200), and clearer diagnostics when serial data is present
+  but not boot protocol traffic.
+* Runtime serial baud switching support on the client side.
+* Cleaner kernel handoff path before *EXEC* (interrupt masking, timer stop, UART cleanup and GPIO pull-clock release),
+  reducing the chance of peripheral state leaking into loaded kernels.
+* Updated build and usage guidance for modern toolchains (e.g. *arm-none-eabi*) and autotools bootstrap
+  (*autoreconf -fiv*).
+
 Relocates itself
 ----------------
 RasPi firmware loads every kernel from SD card at address 0x8000 and then jumps to same address to start
-executing. *PiLoader's* server is no exception. Since this is a second stage bootloader, there's a problem:
+executing. *pi-serial-loader's* server is no exception. Since this is a second stage bootloader, there's a problem:
 things it is meant to load most probably will also want to occupy the space starting from 0x8000. To solve
 this, the bootloader relocates itself away from 0x8000 before starting command processing.
 
@@ -71,12 +93,12 @@ ARM bootloader protocol specifies that registers r0-r2 contains some special val
 * r1 - machine type. Could check if running on RasPi or different board;
 * r2 - pointer to ATags. A way to telling kernel few important things, like available memory amount;
 
-Since *PiLoader* means to be as transparent as possible, it preserves these values and passes them
+Since *pi-serial-loader* means to be as transparent as possible, it preserves these values and passes them
 to kernels when jumping to them.
 
 Supported files
 ----------------------
-*PiLoader* currently is able to load from plain binary and ELF formats.
+*pi-serial-loader* currently is able to load from plain binary and ELF formats.
 
 
 Debugging helpers
@@ -115,7 +137,7 @@ but is just padded with zeros to certain alignment. When loading ELF files, they
 to exclude such parts. The story is different when loading binary files. They are just a "stream of bytes"
 none of which makes any sense to naive loader.
 
-More intelligent loader (which PiLoader is as of recently) can look for big chunks of zeros in binary
+More intelligent loader (which pi-serial-loader is as of recently) can look for big chunks of zeros in binary
 streams and upload them using special command to receiver. In other words: instead of sending, say, 16 KiB
 worth of zeros, it sends a message saying "and now insert 16 KiB of zeros".
 

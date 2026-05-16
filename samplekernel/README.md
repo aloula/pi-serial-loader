@@ -1,7 +1,7 @@
 Sample Kernel
 ============
 
-This is a sample kernel to try out with the rest of *PiLoader*.
+This is a sample kernel to try out with the rest of *pi-serial-loader*.
 
 When started it sends back text "Hello, World!" using UART and then
 returns the control back to the bootloader.
