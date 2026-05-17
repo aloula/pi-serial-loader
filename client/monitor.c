@@ -27,6 +27,9 @@ bool run_monitor;
 void monitor()
 {
     unsigned char c;
+    const char *ready_msg = "PiLoader ready";
+    int msg_idx = 0;
+
     for (;;) {
         ssize_t rd = read(ttyfd, &c, 1);
         if (rd < 0)
@@ -35,5 +38,17 @@ void monitor()
             continue;
         putc((int)c, stdout);
         fflush(stdout);
+
+        if (auto_load) {
+            if (c == ready_msg[msg_idx]) {
+                msg_idx++;
+                if (ready_msg[msg_idx] == '\0') {
+                    vm_print_e(false, "\nAutoload: Pi reboot detected\n");
+                    return;
+                }
+            } else {
+                msg_idx = (c == ready_msg[0]) ? 1 : 0;
+            }
+        }
     }
 }

@@ -69,8 +69,46 @@ Run a kernel with:
 Useful options:
 
 - `-m` starts the serial monitor after `EXEC`.
+- `-a` automatically reloads the kernel when the Pi is power-cycled (waits for "Waiting connection...").
 - `-w` disables the watchdog for kernels that manage it themselves.
 - `-v` enables verbose output.
+
+## Using with WSL (Windows Subsystem for Linux)
+
+To use `piboot` within WSL, you need to pass through the serial port from the Windows host using `usbipd-win`.
+
+### Prerequisites
+
+1.  Install [usbipd-win](https://github.com/dorssel/usbipd-win) on Windows.
+2.  Install the `usbip` client and hardware database in your WSL distribution:
+    ```bash
+    sudo apt update
+    sudo apt install linux-tools-generic hwdata
+    sudo update-alternatives --install /usr/local/bin/usbip usbip /usr/lib/linux-tools/*-generic/usbip 20
+    ```
+
+### Binding and Attaching
+
+1.  Open a Windows Terminal with **Administrator** privileges.
+2.  List available USB devices:
+    ```powershell
+    usbipd list
+    ```
+3.  Identify your serial adapter (e.g., "USB-Serial CH340") and its BUSID (e.g., `2-1`).
+4.  Bind the device (only needed once per device):
+    ```powershell
+    usbipd bind --busid <BUSID>
+    ```
+5.  Attach the device to WSL:
+    ```powershell
+    usbipd attach --wsl --busid <BUSID>
+    ```
+6.  The device should now be visible in WSL as `/dev/ttyUSB0` (or similar). You can verify with `ls /dev/ttyUSB*`.
+
+When finished, you can detach it from Windows:
+```powershell
+usbipd detach --busid <BUSID>
+```
 
 ### Sample kernel
 
@@ -84,7 +122,6 @@ make
 ## Tested examples
 
 - `../samplekernel/kernel.elf` with `-v -w -m` (prints `Hello, World!`).
-- `../../zx-pi-metal/circle-zx/kernel8-32.elf` with `-v -w`.
 
 Both were verified successfully with `LOAD`, `ZERO`, and `EXEC` completing on the bootloader.
 

@@ -30,6 +30,7 @@ uint32_t e_entry = 0x8000;
 uint32_t e_load  = 0x8000;
 int loader_action;
 bool no_watchdog;
+bool auto_load;
 
 int main(int argc, char **argv)
 {
@@ -37,43 +38,56 @@ int main(int argc, char **argv)
 
     parse_cmdline(argc, argv);
 
+    // Save initial state for auto-load
+    uint32_t initial_e_entry = e_entry;
+    uint32_t initial_e_load = e_load;
+    int initial_optind = optind;
+
     setup_serial(port);
 
-    ping();
+    do {
+        // Reset state for each load
+        e_entry = initial_e_entry;
+        e_load = initial_e_load;
+        optind = initial_optind;
 
-    for (;optind < argc; optind++) {
+        ping();
 
-        ufile = fopen(argv[optind], "rb");
-        if (ufile == NULL) {
-            vm_fail("Can not open file %s\n", argv[optind]);
+        for (;optind < argc; optind++) {
+
+            ufile = fopen(argv[optind], "rb");
+            if (ufile == NULL) {
+                vm_fail("Can not open file %s\n", argv[optind]);
+            }
+
+            if (check_elf())
+                load_elf(&e_entry);
+            else
+                load_binary();
+
+            fclose(ufile);
         }
 
-        if (check_elf())
-            load_elf(&e_entry);
-        else
-            load_binary();
+        switch(loader_action)
+        {
+        case LACT_EXEC:
+            exec_program(e_entry);
+            break;
+        case LACT_USAGE:
+            usage();
+            return 0;
+        case LACT_REBOOT:
+            reboot_pi();
+            break;
+        }
 
-        fclose(ufile);
-    }
+        if (run_monitor) {
+            /* Target kernels commonly initialize PL011 for 115200; align monitor speed. */
+            set_serial_baud(115200);
+            monitor();
+        }
 
-    switch(loader_action)
-    {
-    case LACT_EXEC:
-        exec_program(e_entry);
-        break;
-    case LACT_USAGE:
-        usage();
-        break;
-    case LACT_REBOOT:
-        reboot_pi();
-        break;
-    }
-
-    if (run_monitor) {
-        /* Target kernels commonly initialize PL011 for 115200; align monitor speed. */
-        set_serial_baud(115200);
-        monitor();
-    }
+    } while (auto_load);
 
     close(ttyfd);
     return 0;

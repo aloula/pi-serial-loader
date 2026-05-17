@@ -59,6 +59,7 @@ extern FILE *ufile;
 extern int ttyfd;
 extern FILE *ttyfs;
 extern bool run_monitor;
+extern bool auto_load;
 extern char *port;
 extern uint32_t e_entry;
 extern uint32_t e_load;

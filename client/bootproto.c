@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <termios.h>
 #include "bootpc.h"
 #include "bootproto.h"
 
@@ -61,7 +62,7 @@ static void check_response()
         vm_print_e(true, "ERR %x\n", rsp.data);
         break;
     default:
-        vm_print_e(true, "Unknown response\n");
+        vm_print_e(true, "Unknown response: %08x\n", rsp.code);
         break;
     }
     exit(1);
@@ -93,66 +94,77 @@ void ping()
 
     init_hdr(&phdr, BPT_PING);
 
-    vm_print_s("Contacting RasPi bootloader...");
+    tcflush(ttyfd, TCIFLUSH);
 
-    for (baud_i = 0; baud_i < sizeof(baud_try)/sizeof(baud_try[0]); baud_i++) {
-        if (baud_try[baud_i] != get_serial_baud()) {
-            if (set_serial_baud(baud_try[baud_i]) != 0) {
+    if (auto_load) {
+        vm_print_s("Waiting connection...");
+    } else {
+        vm_print_s("Contacting RasPi bootloader...");
+    }
+
+    do {
+        for (baud_i = 0; baud_i < sizeof(baud_try)/sizeof(baud_try[0]); baud_i++) {
+            if (baud_try[baud_i] != get_serial_baud()) {
+                if (set_serial_baud(baud_try[baud_i]) != 0) {
+                    continue;
+                }
+                if (!auto_load) {
+                    vm_print_e(false, " trying %u baud...", baud_try[baud_i]);
+                }
+            }
+
+            seen = 0;
+
+            if (write(ttyfd, &phdr, sizeof(phdr)) != sizeof(phdr)) {
+                vm_print_e(true, "ERROR failed to send PING\n");
+                exit(1);
+            }
+
+            for (tick = 0; tick < max_ticks && seen < max_scan; tick++) {
+            uint8_t b;
+            ssize_t rd = read(ttyfd, &b, 1);
+
+            if (rd < 0) {
+                vm_print_e(true, "ERROR failed to receive response\n");
+                exit(1);
+            }
+
+            if (rd == 0) {
+                if (((tick + 1) % resend_every) == 0) {
+                    if (write(ttyfd, &phdr, sizeof(phdr)) != sizeof(phdr)) {
+                        vm_print_e(true, "ERROR failed to resend PING\n");
+                        exit(1);
+                    }
+                }
                 continue;
             }
-            vm_print_e(false, " trying %u baud...", baud_try[baud_i]);
-        }
 
-        seen = 0;
+            if (seen < sizeof(scan_buf)) {
+                scan_buf[seen] = b;
+            } else {
+                memmove(scan_buf, scan_buf + 1, sizeof(scan_buf) - 1);
+                scan_buf[sizeof(scan_buf) - 1] = b;
+            }
+            seen++;
 
-        if (write(ttyfd, &phdr, sizeof(phdr)) != sizeof(phdr)) {
-            vm_print_e(true, "ERROR failed to send PING\n");
-            exit(1);
-        }
+                if (seen < sizeof(scan_buf))
+                    continue;
 
-        for (tick = 0; tick < max_ticks && seen < max_scan; tick++) {
-        uint8_t b;
-        ssize_t rd = read(ttyfd, &b, 1);
+                memcpy(&rsp, scan_buf, sizeof(rsp));
 
-        if (rd < 0) {
-            vm_print_e(true, "ERROR failed to receive response\n");
-            exit(1);
-        }
+                if (rsp.code == BPR_RDY) {
+                    vm_print_e(false, "OK\n");
+                    tcflush(ttyfd, TCIFLUSH);
+                    return;
+                }
 
-        if (rd == 0) {
-            if (((tick + 1) % resend_every) == 0) {
-                if (write(ttyfd, &phdr, sizeof(phdr)) != sizeof(phdr)) {
-                    vm_print_e(true, "ERROR failed to resend PING\n");
+                if (rsp.code == BPR_ERR) {
+                    vm_print_e(true, "ERR %x\n", rsp.data);
                     exit(1);
                 }
             }
-            continue;
         }
-
-        if (seen < sizeof(scan_buf)) {
-            scan_buf[seen] = b;
-        } else {
-            memmove(scan_buf, scan_buf + 1, sizeof(scan_buf) - 1);
-            scan_buf[sizeof(scan_buf) - 1] = b;
-        }
-        seen++;
-
-            if (seen < sizeof(scan_buf))
-                continue;
-
-            memcpy(&rsp, scan_buf, sizeof(rsp));
-
-            if (rsp.code == BPR_RDY) {
-                vm_print_e(false, "OK\n");
-                return;
-            }
-
-            if (rsp.code == BPR_ERR) {
-                vm_print_e(true, "ERR %x\n", rsp.data);
-                exit(1);
-            }
-        }
-    }
+    } while (auto_load);
 
     memcpy(raw_rsp, scan_buf, sizeof(raw_rsp));
     memcpy(&rsp, raw_rsp, sizeof(rsp));

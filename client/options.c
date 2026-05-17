@@ -26,6 +26,7 @@
 struct option long_options[] = {
     {"help", no_argument, 0, 'h'},
     {"monitor", no_argument, 0, 'm'},
+    {"auto-load", no_argument, 0, 'a'},
     {"beef-bss", no_argument, 0, 'b'},
     {"port", required_argument, 0, 'p'},
     {"verbose", no_argument, 0, 'v'},
@@ -46,6 +47,7 @@ void usage(void)
     printf("    -p | --port <device>    Use specified serial port to communicate.\n");
     printf("    -b | --beef-bss         Fill BSS section with 0xDEADBEEF instead of zeros.\n");
     printf("    -m | --monitor          Start monitoring uart output after starting kernel\n");
+    printf("    -a | --auto-load        Automatically reload kernel when Pi reboots\n");
     printf("    -l | --load-addr <addr> Specify address where to load binary files.\n"
            "       |                    Defaults to 0x8000, increases with each loaded file.\n"
            "       |                    Has no effect when loading ELF files.\n");
@@ -77,7 +79,7 @@ void parse_cmdline(int argc, char **argv)
     loader_action = LACT_EXEC; // Exec by default
 
     for (;;) {
-        c = getopt_long(argc, argv, "hmvbp:l:x:swr", long_options, &option_index);
+        c = getopt_long(argc, argv, "hmvbp:l:x:swra", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -87,6 +89,9 @@ void parse_cmdline(int argc, char **argv)
             return;
         case 'm':
             run_monitor = true;
+            break;
+        case 'a':
+            auto_load = true;
             break;
         case 'b':
             beef_bss = true;
