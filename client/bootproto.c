@@ -154,6 +154,9 @@ void ping()
 
                 if (rsp.code == BPR_RDY) {
                     vm_print_e(false, "OK\n");
+                    // Drain any redundant RDY packets or leftover bootloader text
+                    uint8_t dummy;
+                    while (read(ttyfd, &dummy, 1) > 0);
                     tcflush(ttyfd, TCIFLUSH);
                     return;
                 }

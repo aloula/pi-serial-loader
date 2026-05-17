@@ -43,11 +43,16 @@ void monitor()
             if (c == ready_msg[msg_idx]) {
                 msg_idx++;
                 if (ready_msg[msg_idx] == '\0') {
+                    if (verbose_mode) {
+                        vm_print_e(false, "\nAutoload: Matched '%s'\n", ready_msg);
+                    }
                     vm_print_e(false, "\nAutoload: Pi reboot detected\n");
                     return;
                 }
+            } else if (c == ready_msg[0]) {
+                msg_idx = 1;
             } else {
-                msg_idx = (c == ready_msg[0]) ? 1 : 0;
+                msg_idx = 0;
             }
         }
     }
