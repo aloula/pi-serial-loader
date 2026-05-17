@@ -27,7 +27,7 @@ bool run_monitor;
 void monitor()
 {
     unsigned char c;
-    const char *ready_msg = "PiLoader ready";
+    const char *ready_msg = "PI Serial Loader ready!";
     int msg_idx = 0;
 
     for (;;) {
