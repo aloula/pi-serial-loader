@@ -177,7 +177,7 @@ int kmain(unsigned int r0, unsigned int r1, unsigned int r2)
     pc_io_init();
     timer_init();
 
-    uart_puts("PiLoader ready\r\n");
+    uart_puts("\r\nWaiting connection...\r\nPiLoader ready\r\n");
 
     wdog_stop();
 
