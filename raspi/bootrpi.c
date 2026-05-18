@@ -52,8 +52,7 @@ bool validate_target_addr(uintptr_t addr, size_t size)
 
     run_s -= 4096; // stack (one page should be enough)
 
-    if (run_s <= addr && addr < run_e) return false;
-    if (run_s <= addr_e && addr_e < run_e) return false;
+    if (addr < run_e && addr_e > run_s) return false;
 
     return true;
 }

@@ -21,7 +21,7 @@
 
 ENTRY(_startup)
 load_addr = 0x8000;
-run_addr = 0x00100000;
+run_addr = 0x04000000;
 SECTIONS
 {
     . = load_addr;
