@@ -36,7 +36,13 @@ int main(int argc, char **argv)
 {
 
 
+    load_config();
     parse_cmdline(argc, argv);
+
+    if (loader_action == LACT_USAGE) {
+        usage();
+        return 0;
+    }
 
     // Save initial state for auto-load
     uint32_t initial_e_entry = e_entry;
@@ -73,9 +79,6 @@ int main(int argc, char **argv)
         case LACT_EXEC:
             exec_program(e_entry);
             break;
-        case LACT_USAGE:
-            usage();
-            return 0;
         case LACT_REBOOT:
             reboot_pi();
             break;
@@ -84,7 +87,7 @@ int main(int argc, char **argv)
         if (run_monitor) {
             /* Target kernels commonly initialize PL011 for 115200; align monitor speed. */
             set_serial_baud(115200);
-            monitor();
+            if (!monitor()) break;
         }
 
     } while (auto_load);

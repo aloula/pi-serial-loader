@@ -1,0 +1,28 @@
+# piboot configuration file
+
+# Serial port to use
+# port = /dev/ttyUSB0
+
+# Enable verbose mode (true/false)
+# verbose = true
+
+# Start serial terminal after loading (true/false)
+# terminal = true
+
+# Start monitor mode (read-only) after loading (true/false)
+# monitor = false
+
+# Automatically reload when Pi reboots (true/false)
+# auto_load = true
+
+# Disable watchdog (true/false)
+# no_watchdog = true
+
+# Fill BSS with 0xDEADBEEF (true/false)
+# beef_bss = false
+
+# Default load address (hex)
+# load_addr = 8000
+
+# Default execution address (hex)
+# exec_addr = 8000

@@ -199,8 +199,12 @@ void load_buffer(uint32_t sh_addr, void *sdata, uint32_t sh_size)
     phdr.size = sh_size;
     phdr.crc32 = crc32(0, sdata, sh_size);
 
-    write(ttyfd, &phdr, sizeof(phdr));
-    write(ttyfd, sdata, sh_size);
+    if (write(ttyfd, &phdr, sizeof(phdr)) != sizeof(phdr)) {
+        vm_fail("Failed to write header to serial port.\n");
+    }
+    if (write(ttyfd, sdata, sh_size) != (ssize_t)sh_size) {
+        vm_fail("Failed to write buffer data to serial port.\n");
+    }
 
     check_response();
 }
@@ -212,7 +216,9 @@ void load_section(uint32_t sh_addr, uint32_t sh_offset, uint32_t sh_size)
         vm_fail("Out of memory or something.\n");
     }
     fseek(ufile, sh_offset, SEEK_SET);
-    fread(sdata, sh_size, 1, ufile);
+    if (fread(sdata, sh_size, 1, ufile) != 1) {
+        vm_fail("Failed to read section data from file.\n");
+    }
 
     vm_print_s("LOAD %08x %08x %08x...", sh_addr, sh_offset, sh_size);
 
@@ -232,7 +238,9 @@ void zero_section(uint32_t sh_addr, uint32_t sh_size)
     if (beef_bss)
         phdr.flags |= BPF_BEEF;
 
-    write(ttyfd, &phdr, sizeof(phdr));
+    if (write(ttyfd, &phdr, sizeof(phdr)) != sizeof(phdr)) {
+        vm_fail("Failed to write ZERO header to serial port.\n");
+    }
 
     vm_print_s("%s %08x          %08x...", (beef_bss ? "BEEF" : "ZERO" ), phdr.address, phdr.size);
 
@@ -251,7 +259,9 @@ void exec_program(uint32_t e_entry)
 
     vm_print_e(false, "EXEC %08x%s...", phdr.address, (no_watchdog ? " nwd" : ""));
 
-    write(ttyfd, &phdr, sizeof(phdr));
+    if (write(ttyfd, &phdr, sizeof(phdr)) != sizeof(phdr)) {
+        vm_fail("Failed to write EXEC header to serial port.\n");
+    }
 
     check_response();
 }
@@ -260,13 +270,14 @@ void exec_program(uint32_t e_entry)
 void reboot_pi(void)
 {
     struct bp_hdr phdr;
-    struct bp_rsp rsp;
 
     init_hdr(&phdr, BPT_REBOOT);
 
     vm_print_s("Rebooting the RasPi...");
 
-    write(ttyfd, &phdr, sizeof(phdr));
+    if (write(ttyfd, &phdr, sizeof(phdr)) != sizeof(phdr)) {
+        vm_fail("Failed to write REBOOT header to serial port.\n");
+    }
 
     check_response();
 }

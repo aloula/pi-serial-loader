@@ -32,7 +32,7 @@ void vm_warn(const char *format, ...);
 void vm_print_s(const char *format, ...);
 void vm_print_e(bool force_output, const char *format, ...);
 uint32_t crc32(uint32_t crc, const void *buf, size_t size);
-void monitor();
+bool monitor();
 
 void ping();
 void load_section(uint32_t sh_addr, uint32_t sh_offset, uint32_t sh_size);
@@ -51,6 +51,8 @@ unsigned int get_serial_baud(void);
 
 void usage(void);
 void parse_cmdline(int argc, char **argv);
+void load_config(void);
+uint32_t parse_addr(const char *s_addr);
 
 extern bool verbose_mode;
 extern bool beef_bss;
@@ -59,6 +61,7 @@ extern FILE *ufile;
 extern int ttyfd;
 extern FILE *ttyfs;
 extern bool run_monitor;
+extern bool terminal_mode;
 extern bool auto_load;
 extern char *port;
 extern uint32_t e_entry;

@@ -103,7 +103,9 @@ void load_binary()
         vm_fail("Out of memory or something.\n");
     }
     fseek(ufile, 0, SEEK_SET);
-    fread(sdata, st.st_size, 1, ufile);
+    if (fread(sdata, st.st_size, 1, ufile) != 1) {
+        vm_fail("Failed to read file contents.\n");
+    }
 
 
     struct bin_part *parts = split_binary(sdata, st.st_size);

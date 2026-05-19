@@ -68,10 +68,34 @@ Run a kernel with:
 
 Useful options:
 
-- `-m` starts the serial monitor after `EXEC`.
+- `-m` starts the serial monitor after `EXEC` (read-only).
+- `-t` starts a full two-way serial terminal after `EXEC`. Use `Ctrl-X` to exit.
 - `-a` automatically reloads the kernel when the Pi is power-cycled (waits for "Waiting connection...").
 - `-w` disables the watchdog for kernels that manage it themselves.
 - `-v` enables verbose output.
+- `-c | --config <file>` loads configuration from a file.
+
+## Configuration System
+
+You can simplify your command line by using a configuration file. `piboot` automatically looks for `piboot.conf` in the current directory and `~/.pibootrc` in your home folder.
+
+Example `piboot.conf`:
+```ini
+port = /dev/ttyUSB0
+terminal = true
+verbose = false
+auto_load = true
+no_watchdog = true
+```
+
+Command-line arguments will always override settings in the configuration file.
+
+## Recent Improvements
+
+- **Interactive Terminal Mode**: Added `-t` / `--terminal` to allow interacting with the loaded kernel via UART. Includes raw mode support for arrow keys and terminal control characters.
+- **Robust Error Handling**: Added strict verification for all file I/O and serial communications, eliminating silent failures and compiler warnings.
+- **Improved Monitoring**: The monitor and terminal modes now use `select()` for reliable multiplexing and provide clear status messages.
+- **Reliable Exit**: Terminal mode uses `Ctrl-X` for a clean exit, restoring your local terminal settings and allowing for graceful termination even in auto-reload mode.
 
 ## Using with WSL (Windows Subsystem for Linux)
 

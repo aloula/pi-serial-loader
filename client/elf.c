@@ -61,7 +61,10 @@ static void validate_elf()
 bool check_elf()
 {
     fseek(ufile, 0, SEEK_SET);
-    fread(&e_hdr, sizeof(e_hdr), 1, ufile);
+    if (fread(&e_hdr, sizeof(e_hdr), 1, ufile) != 1) {
+        // Might be a small non-ELF file, just return false
+        return false;
+    }
     return memcmp(e_hdr.e_ident, ELFMAG, SELFMAG) == 0;
 }
 
@@ -80,7 +83,9 @@ void load_elf(uint32_t *entry_addr)
     }
 
     fseek(ufile, e_hdr.e_phoff, SEEK_SET);
-    fread(ph_ents, sizeof(Elf32_Phdr), e_hdr.e_phnum, ufile);
+    if (fread(ph_ents, sizeof(Elf32_Phdr), e_hdr.e_phnum, ufile) != e_hdr.e_phnum) {
+        vm_fail("Failed to read ELF program headers.\n");
+    }
 
     unsigned pi;
     for (pi = 0; pi < e_hdr.e_phnum; pi++) {
